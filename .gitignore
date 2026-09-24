@@ -1,0 +1,33 @@
+# --- Python ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Secrets / local config ---
+.env
+.env.*
+!.env.example
+
+# --- whisper.cpp (vendored, built locally) ---
+third_party/
+models/
+*.ggml
+samples/
+
+# --- Native build artifacts ---
+*.o
+*.so
+*.a
+
+# --- Editor / OS ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
