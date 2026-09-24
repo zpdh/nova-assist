@@ -1,0 +1,13 @@
+# Nova configuration (non-secret defaults).
+# Secrets (API keys) belong in `.env`, never here.
+
+[wake]
+# Spoken phrase that activates the assistant (matched fuzzily).
+phrase = "hey nova"
+
+[llm]
+# OpenAI-compatible gateway (9Router). Override the key via NOVA_LLM_API_KEY.
+base_url = "http://localhost:20128/v1"
+# Empty = let the gateway / task router decide the model.
+model_fast = ""
+model_smart = ""
