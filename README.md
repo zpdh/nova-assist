@@ -53,8 +53,14 @@ podman run --rm nova-test
 The wake phrase is read from `config.toml` and can be overridden by
 `NOVA_WAKE_PHRASE`. The `[stt]` section (`config.toml` / `NOVA_STT_*`) selects
 the speech-to-text backend: `server` (resident model, lower latency) or `cli`.
-LLM settings (`NOVA_LLM_*`) are read from the environment only and have no
-defaults.
+LLM settings come from the environment:
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `NOVA_LLM_BASE_URL` | no | `http://localhost:20128/v1` | OpenAI-compatible endpoint |
+| `NOVA_LLM_API_KEY` | yes | — | bearer token |
+| `NOVA_LLM_MODEL` | yes | — | model id to use |
+| `NOVA_LLM_SEARCH_PROVIDER` | no | `tavily` | provider id for the search endpoint |
 
 ## Speech-to-text
 
@@ -78,6 +84,29 @@ spotting; the protocol is kept narrow so adding one is not a rewrite.
   `with`). Selecting a port is subject to a probe/bind race, so startup is
   retried up to 3 times with a fresh port before failing.
 - One HTTP client is reused for the server's lifetime.
+
+## Brain
+
+The `nova.brain` package answers a message with an OpenAI-compatible model and
+can search the web. `build_brain` wires a chat client, a model router, and the
+tool dispatchers from configuration; callers use `Brain` only.
+
+- `Brain.ask(text)` — one question in, the answer text out.
+- `Brain.chat(messages)` — a conversation, returning a `ChatResult`.
+
+When the model asks for `web_search`, the brain calls the gateway's
+`/search` endpoint, feeds the results back, and repeats up to
+`MAX_TOOL_ROUNDS` (2) times. A `ModelRouter` (a Strategy) chooses the model;
+the current implementation always returns the configured one.
+
+### Demo
+
+```bash
+python -m nova.brain "what is the capital of France"
+```
+
+Requires `NOVA_LLM_API_KEY` and `NOVA_LLM_MODEL` in `.env`. Some models reject
+tool calls (web search needs a tool-capable model).
 
 ## Logging
 
