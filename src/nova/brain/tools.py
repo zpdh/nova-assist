@@ -48,10 +48,14 @@ def build_dispatchers(search: WebSearchClient) -> dict[str, Callable[[dict[str, 
 
 
 def _make_web_search(search: WebSearchClient) -> Callable[[dict[str, Any]], str]:
+	# Return a callable that already holds the search client, so the dispatch
+    # table maps a tool name to a one-argument function (the tool arguments).
+    # This keeps the brain unaware of which clients each tool needs.
     def run(arguments: dict[str, Any]) -> str:
         query = str(arguments.get("query", "")).strip()
         if not query:
             return "error: missing 'query' argument"
+
         results = search.search(query)
         return _format_results(results)
 
@@ -61,6 +65,7 @@ def _make_web_search(search: WebSearchClient) -> Callable[[dict[str, Any]], str]
 def _format_results(results: list[SearchResult]) -> str:
     if not results:
         return "no results found"
+
     lines = []
     for i, result in enumerate(results, start=1):
         lines.append(f"{i}. {result.title}\n   {result.url}\n   {result.snippet}")
