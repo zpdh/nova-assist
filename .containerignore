@@ -1,0 +1,9 @@
+# Keep the Podman build context small: exclude vendored sources, models,
+# virtualenvs, and local scratch. Only project code and config are needed.
+third_party/
+models/
+samples/
+tmp/
+.venv/
+.git/
+docs/

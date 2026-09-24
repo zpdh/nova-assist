@@ -29,9 +29,19 @@ python -m venv .venv
 ## Development
 
 ```bash
-.venv/bin/pytest          # run tests
-.venv/bin/ruff check .    # lint
-.venv/bin/ruff format .   # format
+.venv/bin/pytest                     # unit tests (no hardware needed)
+.venv/bin/pytest -m integration      # opt-in: real whisper.cpp + model
+.venv/bin/ruff check .               # lint
+.venv/bin/ruff format .              # format
+```
+
+### Test container (optional)
+
+The hardware-free suite also runs in a clean Podman image:
+
+```bash
+podman build -f containers/test.Containerfile -t nova-test .
+podman run --rm nova-test
 ```
 
 ## Configuration
@@ -41,8 +51,21 @@ python -m venv .venv
   `.env.example`.
 
 The wake phrase is read from `config.toml` and can be overridden by
-`NOVA_WAKE_PHRASE`. LLM settings (`NOVA_LLM_*`) are read from the environment
-only and have no defaults.
+`NOVA_WAKE_PHRASE`. The `[stt]` section (`config.toml` / `NOVA_STT_*`) selects
+the speech-to-text backend: `server` (resident model, lower latency) or `cli`.
+LLM settings (`NOVA_LLM_*`) are read from the environment only and have no
+defaults.
+
+## Speech-to-text
+
+The `nova.stt` package exposes a `Transcriber` protocol and a
+`build_transcriber` factory. Backends:
+
+- **server** (default): a resident `whisper-server`, model kept in VRAM,
+  OpenAI-compatible `/inference`.
+- **cli**: one `whisper-cli` invocation per file (simpler, reloads the model).
+
+Both return a `Transcript` with text and optional word-level timings.
 
 ## Layout
 
@@ -50,6 +73,6 @@ only and have no defaults.
 src/nova/       application package
 tests/          pytest suite
 scripts/        build helpers (whisper.cpp Vulkan)
-containers/     optional Podman build for whisper.cpp
+containers/     optional Podman build + test images
 docs/           design notes and proofs
 ```
