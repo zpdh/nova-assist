@@ -66,6 +66,7 @@ class Config:
                 configured value is invalid.
         """
         raw = _read_toml(path if path is not None else DEFAULT_CONFIG_PATH)
+        config_dir = (path if path is not None else DEFAULT_CONFIG_PATH).parent
         wake_raw = raw.get("wake", {})
         stt_raw = raw.get("stt", {})
 
@@ -78,19 +79,23 @@ class Config:
             model_fast=_optional_env("LLM_MODEL_FAST"),
             model_smart=_optional_env("LLM_MODEL_SMART"),
         )
-        stt = _build_stt_config(stt_raw)
+        stt = _build_stt_config(stt_raw, config_dir)
         return cls(llm=llm, wake=wake, stt=stt)
 
 
-def _build_stt_config(section: dict) -> SttConfig:
+def _build_stt_config(section: dict, config_dir: Path) -> SttConfig:
     """Build an :class:`SttConfig` from TOML values + ``NOVA_STT_*`` env."""
     default = SttConfig()
     stt = SttConfig(
         backend=_env("STT_BACKEND", _str_or(section, "backend", default.backend)),
-        model_path=_path_env("STT_MODEL_PATH", _path_or(section, "model_path", default.model_path)),
-        cli_path=_path_env("STT_CLI_PATH", _path_or(section, "cli_path", default.cli_path)),
+        model_path=_path_env(
+            "STT_MODEL_PATH", _path_or(section, "model_path", default.model_path, config_dir)
+        ),
+        cli_path=_path_env(
+            "STT_CLI_PATH", _path_or(section, "cli_path", default.cli_path, config_dir)
+        ),
         server_path=_path_env(
-            "STT_SERVER_PATH", _path_or(section, "server_path", default.server_path)
+            "STT_SERVER_PATH", _path_or(section, "server_path", default.server_path, config_dir)
         ),
         threads=int(_env("STT_THREADS", str(_int_or(section, "threads", default.threads)))),
         device=_env("STT_DEVICE", _str_or(section, "device", default.device)),
@@ -115,18 +120,18 @@ def _str_or(section: dict, key: str, default: str) -> str:
     return str(value) if value is not None else default
 
 
-def _path_or(section: dict, key: str, default: Path) -> Path:
+def _path_or(section: dict, key: str, default: Path, base_dir: Path) -> Path:
     """Read ``section[key]`` as a path, falling back to ``default``.
 
-    Relative paths are resolved against the config file's directory (the repo
-    root) so behavior does not depend on the current working directory.
+    Relative paths are resolved against ``base_dir`` (the config file's
+    directory) so behavior does not depend on the current working directory.
     """
     value = section.get(key)
     if value in (None, ""):
         return default
     path = Path(str(value))
     if not path.is_absolute():
-        path = DEFAULT_CONFIG_PATH.parent / path
+        path = base_dir / path
     return path
 
 
