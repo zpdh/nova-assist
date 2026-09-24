@@ -49,10 +49,10 @@ Gate passed: the model is loaded onto `Vulkan0`, not CPU.
 
 ```
 ./third_party/whisper.cpp/build/bin/whisper-cli \
-  -m models/ggml-tiny.en.bin -f tmp/luna_test.wav
+  -m models/ggml-tiny.en.bin -f tmp/nova_test.wav
 ```
 
-Input `tmp/luna_test.wav`: 16 kHz mono, 2.86 s (converted from mp3 via ffmpeg).
+Input `tmp/nova_test.wav`: 16 kHz mono, 2.86 s (converted from mp3 via ffmpeg).
 
 ## Results
 
@@ -77,6 +77,13 @@ Transcript (identical on both backends): `Hello, test.`
 - Runtime links against the host `libvulkan.so.1` + RADV; the binary is a native
   Fedora ELF. A Podman build is available as an optional alternative
   (`scripts/build-whisper-podman.sh`) but is not required.
+- The build sets an `$ORIGIN` RUNPATH so the binaries are relocatable: they
+  resolve `libwhisper.so`/`libggml*.so` from their own directory. Without this,
+  moving or renaming the repo makes the dynamic loader fail with
+  `libwhisper.so.1: cannot open shared object file`.
+- The app is named **Nova**; the wake phrase is **"Hey Nova"**. On the `tiny.en`
+  model a recorded clip transcribes the phrase verbatim:
+  `Hey Nova, this is a test to see if you pick up my audio correctly.`
 
 ## Reproduction
 
@@ -88,8 +95,8 @@ git clone --depth 1 --branch v1.9.4 \
 # 2. model + audio
 curl -L -o models/ggml-tiny.en.bin \
   https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin
-ffmpeg -i <clip> -ar 16000 -ac 1 -c:a pcm_s16le tmp/luna_test.wav
+ffmpeg -i <clip> -ar 16000 -ac 1 -c:a pcm_s16le tmp/nova_test.wav
 # 3. transcribe
 ./third_party/whisper.cpp/build/bin/whisper-cli \
-  -m models/ggml-tiny.en.bin -f tmp/luna_test.wav
+  -m models/ggml-tiny.en.bin -f tmp/nova_test.wav
 ```

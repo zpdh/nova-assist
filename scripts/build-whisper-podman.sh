@@ -14,7 +14,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC_DIR="${REPO_ROOT}/third_party/whisper.cpp"
 CONTAINERFILE="${REPO_ROOT}/containers/whisper-build.Containerfile"
-IMAGE="luna-whisper-build:latest"
+IMAGE="nova-whisper-build:latest"
 CID=""
 
 cleanup() {

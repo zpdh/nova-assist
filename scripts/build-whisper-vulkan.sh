@@ -23,11 +23,17 @@ if [[ ! -f "${SRC_DIR}/CMakeLists.txt" ]]; then
 fi
 
 echo "==> Configuring (Vulkan backend, Release)"
+# $ORIGIN RPATH makes the binaries relocatable: they resolve the shared
+# libraries from their own directory (build/bin), not a fixed absolute path.
+# Without this, moving/renaming the repo breaks libwhisper.so/libggml*.so loading.
 cmake -S "${SRC_DIR}" -B "${BUILD_DIR}" \
   -DCMAKE_BUILD_TYPE=Release \
   -DGGML_VULKAN=ON \
   -DWHISPER_BUILD_EXAMPLES=ON \
-  -DWHISPER_BUILD_TESTS=OFF
+  -DWHISPER_BUILD_TESTS=OFF \
+  -DCMAKE_BUILD_RPATH='$ORIGIN' \
+  -DCMAKE_INSTALL_RPATH='$ORIGIN' \
+  -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON
 
 echo "==> Building"
 cmake --build "${BUILD_DIR}" --config Release -j"$(nproc)"
