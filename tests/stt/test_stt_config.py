@@ -16,8 +16,8 @@ def _clear_nova_env(monkeypatch) -> None:
 
 
 def _llm_env(monkeypatch) -> None:
-    monkeypatch.setenv(f"{ENV_PREFIX}LLM_BASE_URL", "http://x/v1")
     monkeypatch.setenv(f"{ENV_PREFIX}LLM_API_KEY", "k")
+    monkeypatch.setenv(f"{ENV_PREFIX}LLM_MODEL", "m")
 
 
 def test_stt_defaults(monkeypatch):

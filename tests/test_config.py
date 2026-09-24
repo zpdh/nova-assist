@@ -16,10 +16,14 @@ def _clear_nova_env(monkeypatch) -> None:
         monkeypatch.delenv(key, raising=False)
 
 
+def _set_llm_env(monkeypatch) -> None:
+    monkeypatch.setenv(f"{ENV_PREFIX}LLM_API_KEY", "secret")
+    monkeypatch.setenv(f"{ENV_PREFIX}LLM_MODEL", "my-model")
+
+
 def test_wake_defaults_when_no_file(monkeypatch):
     _clear_nova_env(monkeypatch)
-    monkeypatch.setenv(f"{ENV_PREFIX}LLM_BASE_URL", "http://example.test/v1")
-    monkeypatch.setenv(f"{ENV_PREFIX}LLM_API_KEY", "secret")
+    _set_llm_env(monkeypatch)
 
     cfg = Config.load(path=Path("/nonexistent/config.toml"))
 
@@ -28,8 +32,7 @@ def test_wake_defaults_when_no_file(monkeypatch):
 
 def test_toml_overrides_wake_default(tmp_path: Path, monkeypatch):
     _clear_nova_env(monkeypatch)
-    monkeypatch.setenv(f"{ENV_PREFIX}LLM_BASE_URL", "http://example.test/v1")
-    monkeypatch.setenv(f"{ENV_PREFIX}LLM_API_KEY", "secret")
+    _set_llm_env(monkeypatch)
 
     cfg_file = tmp_path / "config.toml"
     cfg_file.write_text('[wake]\nphrase = "oi nova"\n')
@@ -44,8 +47,7 @@ def test_env_overrides_toml_wake(tmp_path: Path, monkeypatch):
     cfg_file = tmp_path / "config.toml"
     cfg_file.write_text('[wake]\nphrase = "from file"\n')
 
-    monkeypatch.setenv(f"{ENV_PREFIX}LLM_BASE_URL", "http://example.test/v1")
-    monkeypatch.setenv(f"{ENV_PREFIX}LLM_API_KEY", "secret")
+    _set_llm_env(monkeypatch)
     monkeypatch.setenv(f"{ENV_PREFIX}WAKE_PHRASE", "hey override")
 
     cfg = Config.load(path=cfg_file)
@@ -55,26 +57,38 @@ def test_env_overrides_toml_wake(tmp_path: Path, monkeypatch):
 
 def test_llm_reads_from_env(monkeypatch):
     _clear_nova_env(monkeypatch)
-    monkeypatch.setenv(f"{ENV_PREFIX}LLM_BASE_URL", "http://env-only/v1")
     monkeypatch.setenv(f"{ENV_PREFIX}LLM_API_KEY", "secret")
-    monkeypatch.setenv(f"{ENV_PREFIX}LLM_MODEL_FAST", "fast")
+    monkeypatch.setenv(f"{ENV_PREFIX}LLM_MODEL", "my-model")
+
+    cfg = Config.load()
+
+    assert cfg.llm.api_key == "secret"
+    assert cfg.llm.model == "my-model"
+    # base_url and search_provider have defaults.
+    assert cfg.llm.base_url == "http://localhost:20128/v1"
+    assert cfg.llm.search_provider == "tavily"
+
+
+def test_llm_base_url_and_provider_override(monkeypatch):
+    _clear_nova_env(monkeypatch)
+    monkeypatch.setenv(f"{ENV_PREFIX}LLM_API_KEY", "secret")
+    monkeypatch.setenv(f"{ENV_PREFIX}LLM_MODEL", "my-model")
+    monkeypatch.setenv(f"{ENV_PREFIX}LLM_BASE_URL", "http://env-only/v1")
+    monkeypatch.setenv(f"{ENV_PREFIX}LLM_SEARCH_PROVIDER", "brave")
 
     cfg = Config.load()
 
     assert cfg.llm.base_url == "http://env-only/v1"
-    assert cfg.llm.api_key == "secret"
-    assert cfg.llm.model_fast == "fast"
-    # Unset optional model is None, not empty string.
-    assert cfg.llm.model_smart is None
+    assert cfg.llm.search_provider == "brave"
 
 
 def test_missing_required_llm_env_raises(monkeypatch):
     _clear_nova_env(monkeypatch)
 
-    with pytest.raises(ValueError, match="NOVA_LLM_BASE_URL"):
+    with pytest.raises(ValueError, match="NOVA_LLM_API_KEY"):
         Config.load()
 
-    monkeypatch.setenv(f"{ENV_PREFIX}LLM_BASE_URL", "http://example.test/v1")
+    monkeypatch.setenv(f"{ENV_PREFIX}LLM_API_KEY", "secret")
 
-    with pytest.raises(ValueError, match="NOVA_LLM_API_KEY"):
+    with pytest.raises(ValueError, match="NOVA_LLM_MODEL"):
         Config.load()
