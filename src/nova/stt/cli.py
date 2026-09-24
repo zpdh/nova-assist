@@ -20,7 +20,7 @@ from nova.stt.types import Transcript
 log = logging.getLogger(__name__)
 
 # whisper-cli writes one file per requested format. ``-oj`` selects JSON and the
-# produced file is named ``<output-prefix>.json`` (``-of`` is a path *prefix*,
+# produced file is named ``<output-prefix>.json`` (``-of`` is a path prefix,
 # without an extension). Keep the flag and extension paired here.
 _OUTPUT_FLAG = "-oj"
 _OUTPUT_EXT = ".json"

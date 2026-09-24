@@ -80,7 +80,7 @@ def _unique_log_path(log_dir: Path) -> Path:
     """Return a dated log path, appending ``-N`` until a free name is found.
 
     Uses an exclusive create so two concurrent processes cannot pick the same
-    name (avoids a TOCTOU race of its own).
+    name (avoids a race of its own).
     """
     stamp = date.today().isoformat()
     suffix = 1

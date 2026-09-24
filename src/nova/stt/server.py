@@ -55,8 +55,6 @@ class WhisperServerTranscriber:
         self._process: subprocess.Popen[bytes] | None = None
         self._log_path: Path | None = None
         self._log_file = None
-        # One client reused across requests; closed by close(). A shared,
-        # app-scoped client will be introduced with the app context in I5.
         self._client = httpx.Client(timeout=_REQUEST_TIMEOUT_S)
 
     # -- public API -------------------------------------------------------
@@ -138,7 +136,11 @@ class WhisperServerTranscriber:
 
         last_error: Exception | None = None
         for attempt in range(1, _STARTUP_ATTEMPTS + 1):
-            # Pick a fresh port each attempt to absorb a TOCTOU collision.
+            # Pick a fresh port each attempt to absorb a collision.
+            # (port gets assigned
+            # -> socket connection closes
+            # -> socket assigned to another process
+            # -> address in use err)
             self._port = _free_port(self._config.server_port, self._host)
             try:
                 self._start_process()
