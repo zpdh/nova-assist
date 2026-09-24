@@ -9,7 +9,9 @@ description = "Nova - a local, always-listening voice assistant for the desktop.
 readme = "README.md"
 requires-python = ">=3.14"
 license = { text = "MIT" }
-dependencies = []
+dependencies = [
+    "httpx>=0.27",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -23,6 +25,9 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+    "integration: requires the real whisper.cpp binary and a model (opt-in)",
+]
 
 [tool.ruff]
 line-length = 100

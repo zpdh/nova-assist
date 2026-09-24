@@ -4,3 +4,13 @@
 [wake]
 # Spoken phrase that activates the assistant (matched fuzzily).
 phrase = "hey nova"
+
+[stt]
+# Speech-to-text backend: "server" (resident model, lower latency) or "cli".
+backend = "server"
+# Paths default to the in-repo whisper.cpp build and model; override as needed.
+model_path = "models/ggml-tiny.en.bin"
+threads = 4
+# "auto" uses the GPU when available; "cpu" forces CPU (-ng).
+device = "auto"
+server_port = 18090

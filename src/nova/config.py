@@ -17,6 +17,8 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from nova.stt.config import SttConfig
+
 ENV_PREFIX = "NOVA_"
 
 # Repo root = two levels up from this file (src/nova/config.py -> repo root).
@@ -49,6 +51,7 @@ class Config:
 
     llm: LlmConfig
     wake: WakeConfig = field(default_factory=WakeConfig)
+    stt: SttConfig = field(default_factory=SttConfig)
 
     @classmethod
     def load(cls, path: Path | None = None) -> Config:
@@ -59,10 +62,12 @@ class Config:
                 root. Missing files are ignored.
 
         Raises:
-            ValueError: if a required LLM environment variable is missing.
+            ValueError: if a required LLM environment variable is missing, or a
+                configured value is invalid.
         """
         raw = _read_toml(path if path is not None else DEFAULT_CONFIG_PATH)
         wake_raw = raw.get("wake", {})
+        stt_raw = raw.get("stt", {})
 
         wake = WakeConfig(
             phrase=_env("WAKE_PHRASE", _str_or(wake_raw, "phrase", WakeConfig.phrase)),
@@ -73,7 +78,27 @@ class Config:
             model_fast=_optional_env("LLM_MODEL_FAST"),
             model_smart=_optional_env("LLM_MODEL_SMART"),
         )
-        return cls(llm=llm, wake=wake)
+        stt = _build_stt_config(stt_raw)
+        return cls(llm=llm, wake=wake, stt=stt)
+
+
+def _build_stt_config(section: dict) -> SttConfig:
+    """Build an :class:`SttConfig` from TOML values + ``NOVA_STT_*`` env."""
+    default = SttConfig()
+    stt = SttConfig(
+        backend=_env("STT_BACKEND", _str_or(section, "backend", default.backend)),
+        model_path=_path_env("STT_MODEL_PATH", _path_or(section, "model_path", default.model_path)),
+        cli_path=_path_env("STT_CLI_PATH", _path_or(section, "cli_path", default.cli_path)),
+        server_path=_path_env(
+            "STT_SERVER_PATH", _path_or(section, "server_path", default.server_path)
+        ),
+        threads=int(_env("STT_THREADS", str(_int_or(section, "threads", default.threads)))),
+        device=_env("STT_DEVICE", _str_or(section, "device", default.device)),
+        server_port=int(
+            _env("STT_SERVER_PORT", str(_int_or(section, "server_port", default.server_port)))
+        ),
+    )
+    return stt.validated()
 
 
 def _read_toml(path: Path) -> dict:
@@ -88,6 +113,27 @@ def _str_or(section: dict, key: str, default: str) -> str:
     """Read ``section[key]`` as a str, falling back to ``default``."""
     value = section.get(key, default)
     return str(value) if value is not None else default
+
+
+def _path_or(section: dict, key: str, default: Path) -> Path:
+    """Read ``section[key]`` as a path, falling back to ``default``.
+
+    Relative paths are resolved against the config file's directory (the repo
+    root) so behavior does not depend on the current working directory.
+    """
+    value = section.get(key)
+    if value in (None, ""):
+        return default
+    path = Path(str(value))
+    if not path.is_absolute():
+        path = DEFAULT_CONFIG_PATH.parent / path
+    return path
+
+
+def _int_or(section: dict, key: str, default: int) -> int:
+    """Read ``section[key]`` as an int, falling back to ``default``."""
+    value = section.get(key, default)
+    return int(value)
 
 
 def _env(suffix: str, default: str) -> str:
@@ -110,4 +156,10 @@ def _optional_env(suffix: str) -> str | None:
     return value if value not in (None, "") else None
 
 
-__all__ = ["Config", "LlmConfig", "WakeConfig", "DEFAULT_CONFIG_PATH", "ENV_PREFIX"]
+def _path_env(suffix: str, default: Path) -> Path:
+    """Return ``NOVA_<suffix>`` as a path, else ``default``."""
+    value = _optional_env(suffix)
+    return Path(value) if value is not None else default
+
+
+__all__ = ["Config", "LlmConfig", "WakeConfig", "SttConfig", "DEFAULT_CONFIG_PATH", "ENV_PREFIX"]
