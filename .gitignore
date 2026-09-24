@@ -21,6 +21,9 @@ models/
 *.ggml
 samples/
 
+# --- Local scratch (test clips, throwaway artifacts) ---
+tmp/
+
 # --- Native build artifacts ---
 *.o
 *.so
