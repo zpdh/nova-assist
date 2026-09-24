@@ -42,12 +42,30 @@ class SearchResult:
 
 
 @dataclass(frozen=True)
+class Completion:
+    """One raw model response, as returned by the chat client.
+
+    Internal to the brain layer: the tool loop reads ``tool_calls`` to decide
+    whether to keep going.
+    """
+
+    text: str = ""
+    model: str = ""
+    tool_calls: tuple[dict[str, Any], ...] = ()
+    usage: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class ChatResult:
-    """The outcome of one assistant turn."""
+    """The outcome of one assistant turn.
+
+    ``turns`` holds the messages generated this turn (assistant tool-call turns,
+    tool results, and the final assistant turn) so the caller can persist them.
+    """
 
     text: str
     model: str = ""
-    tool_calls: tuple[dict[str, Any], ...] = ()
+    turns: tuple[Message, ...] = ()
     usage: dict[str, Any] = field(default_factory=dict)
 
 

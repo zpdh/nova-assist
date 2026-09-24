@@ -14,7 +14,7 @@ from typing import Any
 import httpx
 
 from nova.brain.errors import BrainError, BrainTimeout
-from nova.brain.types import ChatResult, Message
+from nova.brain.types import Completion, Message
 
 log = logging.getLogger(__name__)
 
@@ -40,8 +40,8 @@ class ChatClient:
         self,
         messages: list[Message],
         tools: list[dict[str, Any]] | None = None,
-    ) -> ChatResult:
-        """Send ``messages`` and return the assistant's turn."""
+    ) -> Completion:
+        """Send ``messages`` and return the model's response."""
         payload: dict[str, Any] = {
             "model": self._model,
             "messages": [m.to_payload() for m in messages],
@@ -98,7 +98,7 @@ def decode_first_json(text: str) -> dict[str, Any] | None:
     return document if isinstance(document, dict) else None
 
 
-def _parse_chat_result(document: dict[str, Any]) -> ChatResult:
+def _parse_chat_result(document: dict[str, Any]) -> Completion:
     choices = document.get("choices") or []
     if not choices:
         raise BrainError("chat endpoint returned no choices")
@@ -107,7 +107,7 @@ def _parse_chat_result(document: dict[str, Any]) -> ChatResult:
     tool_calls = tuple(message.get("tool_calls") or [])
     content = message.get("content")
 
-    return ChatResult(
+    return Completion(
         text=content or "",
         model=str(document.get("model", "")),
         tool_calls=tool_calls,

@@ -14,20 +14,20 @@ from typing import Any
 from nova.brain.client import ChatClient, parse_tool_arguments
 from nova.brain.router import ModelRouter
 from nova.brain.tools import tool_schemas
-from nova.brain.types import ChatResult, Message
+from nova.brain.types import ChatResult, Completion, Message
 
 log = logging.getLogger(__name__)
 
 MAX_TOOL_ROUNDS = 2
 
-SYSTEM_PROMPT = (
-    "You are Nova, a concise voice assistant. Answer briefly and directly. "
-    "Use the web_search tool when the answer needs current or verifiable facts."
-)
-
 
 class Brain:
-    """Answers user messages, running tools the model asks for."""
+    """Answers user messages, running tools the model asks for.
+
+    The brain is stateless: it sends the messages it is given and returns the
+    assistant's turn. The system prompt and conversation history are supplied by
+    the caller (for example, the session service).
+    """
 
     def __init__(
         self,
@@ -44,24 +44,39 @@ class Brain:
         return self.chat([Message(role="user", content=text)]).text
 
     def chat(self, messages: list[Message]) -> ChatResult:
-        """Run the conversation, resolving tool calls, and return the result."""
-        conversation = [Message(role="system", content=SYSTEM_PROMPT), *messages]
+        """Run the conversation, resolving tool calls, and return the result.
+
+        ``turns`` on the result holds the messages generated this turn
+        (assistant tool-call turns, tool results, and the final assistant turn)
+        so the caller can persist them.
+        """
+        conversation = list(messages)
         result = self._client.complete(conversation, tools=tool_schemas())
+        generated: list[Message] = []
 
         for round_index in range(MAX_TOOL_ROUNDS + 1):
             if not result.tool_calls:
-                return result
+                if result.text:
+                    generated.append(Message(role="assistant", content=result.text))
+                return _with_turns(result, generated)
             if round_index == MAX_TOOL_ROUNDS:
                 log.warning("tool-call limit reached; returning current answer")
-                return result
+                generated.append(
+                    Message(role="assistant", content=None, tool_calls=result.tool_calls)
+                )
+                return _with_turns(result, generated)
 
-            conversation.append(
-                Message(role="assistant", content=None, tool_calls=result.tool_calls)
-            )
-            conversation.extend(self._resolve_tool_calls(result.tool_calls))
+            assistant_turn = Message(role="assistant", content=None, tool_calls=result.tool_calls)
+            conversation.append(assistant_turn)
+            generated.append(assistant_turn)
+
+            tool_turns = self._resolve_tool_calls(result.tool_calls)
+            conversation.extend(tool_turns)
+            generated.extend(tool_turns)
+
             result = self._client.complete(conversation, tools=tool_schemas())
 
-        return result
+        return _with_turns(result, generated)
 
     def _resolve_tool_calls(self, tool_calls: tuple[dict[str, Any], ...]) -> list[Message]:
         messages = []
@@ -90,4 +105,14 @@ class Brain:
         self._client.close()
 
 
-__all__ = ["Brain", "MAX_TOOL_ROUNDS", "SYSTEM_PROMPT"]
+def _with_turns(result: Completion, generated: list[Message]) -> ChatResult:
+    """Return a :class:`ChatResult` built from ``result`` and the generated turns."""
+    return ChatResult(
+        text=result.text,
+        model=result.model,
+        turns=tuple(generated),
+        usage=result.usage,
+    )
+
+
+__all__ = ["Brain", "MAX_TOOL_ROUNDS"]
