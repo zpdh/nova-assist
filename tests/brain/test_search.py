@@ -74,6 +74,18 @@ def test_search_sends_provider_and_query(fake_search_server):
     client.close()
 
 
+def test_search_parses_body_with_trailing_done_marker(fake_search_server):
+    # The gateway may glue ``data: [DONE]`` onto the JSON with no separator.
+    framed = (json.dumps(_SEARCH_RESPONSE) + "data: [DONE]").encode()
+    fake_search_server.response_body = framed
+    client = _client(fake_search_server)
+
+    results = client.search("x")
+
+    assert [r.title for r in results] == ["T1", "T2"]
+    client.close()
+
+
 def test_non_200_raises(fake_search_server):
     fake_search_server.status = 500
     fake_search_server.response_body = b"boom"

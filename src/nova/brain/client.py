@@ -62,7 +62,7 @@ class ChatClient:
                 f"chat endpoint returned {response.status_code}: {response.text.strip()}"
             )
 
-        document = _parse_json(response, "chat endpoint")
+        document = parse_json_response(response, "chat endpoint")
         return _parse_chat_result(document)
 
     def close(self) -> None:
@@ -71,9 +71,14 @@ class ChatClient:
             self._client.close()
 
 
-def _parse_json(response: httpx.Response, source: str) -> dict[str, Any]:
-    # Some providers pad the body with whitespace and append an SSE-style
-    # terminator (``data: [DONE]``). Decode the first JSON object in the body.
+def parse_json_response(response: httpx.Response, source: str) -> dict[str, Any]:
+    """Decode the single JSON object in an SSE-tagged response body.
+
+    The gateway replies with ``Content-Type: text/event-stream`` even for
+    non-streamed requests, and appends ``data: [DONE]`` right after the JSON
+    object with no separator. The object is not framed by ``data:``. Decode the
+    first ``{...}`` and ignore any trailing bytes.
+    """
     document = decode_first_json(response.text)
     if document is None:
         raise BrainError(f"{source} returned invalid JSON")

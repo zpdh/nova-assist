@@ -12,7 +12,7 @@ from typing import Any
 
 import httpx
 
-from nova.brain.client import decode_first_json
+from nova.brain.client import parse_json_response
 from nova.brain.errors import BrainError, BrainTimeout
 from nova.brain.types import SearchResult
 
@@ -53,9 +53,7 @@ class WebSearchClient:
                 f"search endpoint returned {response.status_code}: {response.text.strip()}"
             )
 
-        document = decode_first_json(response.text)
-        if document is None:
-            raise BrainError("search endpoint returned invalid JSON")
+        document = parse_json_response(response, "search endpoint")
 
         return _parse_results(document)
 
