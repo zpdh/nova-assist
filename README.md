@@ -36,10 +36,13 @@ python -m venv .venv
 
 ## Configuration
 
-- `config.toml` — non-secret defaults (wake phrase, gateway URL, models).
-- `.env` — secrets and local overrides (gitignored). Copy from `.env.example`.
+- `config.toml` — non-secret defaults (currently the wake phrase).
+- `.env` — secrets and deployment-specific settings, gitignored. Copy from
+  `.env.example`.
 
-Precedence: defaults → `config.toml` → environment (`NOVA_*`).
+The wake phrase is read from `config.toml` and can be overridden by
+`NOVA_WAKE_PHRASE`. LLM settings (`NOVA_LLM_*`) are read from the environment
+only and have no defaults.
 
 ## Layout
 

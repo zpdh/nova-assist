@@ -1,11 +1,11 @@
 """Typed application configuration.
 
-Precedence (lowest to highest):
+``WakeConfig`` is read from an optional TOML file (default: ``config.toml`` at
+the repo root) and can be overridden by environment variables.
 
-1. Built-in defaults (the dataclass field defaults).
-2. Values from a TOML file (default: ``config.toml`` at the repo root).
-3. Environment variables (``NOVA_*``), typically supplied via a local ``.env``
-   that is loaded by the caller/shell.
+``LlmConfig`` is sourced entirely from environment variables (``NOVA_*``),
+typically supplied via a local ``.env`` loaded by the caller/shell. It has no
+built-in defaults: LLM settings are deployment-specific.
 
 Secrets must never live in the TOML file; they come from the environment.
 """
@@ -25,12 +25,15 @@ DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config.toml"
 
 @dataclass(frozen=True)
 class LlmConfig:
-    """LLM / search gateway settings (9Router, OpenAI-compatible)."""
+    """LLM settings for an OpenAI-compatible endpoint.
 
-    base_url: str = "http://localhost:20128/v1"
-    api_key: str = ""
-    model_fast: str = ""
-    model_smart: str = ""
+    All values come from environment variables; none have defaults.
+    """
+
+    base_url: str
+    api_key: str
+    model_fast: str | None = None
+    model_smart: str | None = None
 
 
 @dataclass(frozen=True)
@@ -44,35 +47,33 @@ class WakeConfig:
 class Config:
     """Top-level Nova configuration."""
 
+    llm: LlmConfig
     wake: WakeConfig = field(default_factory=WakeConfig)
-    llm: LlmConfig = field(default_factory=LlmConfig)
 
     @classmethod
     def load(cls, path: Path | None = None) -> Config:
-        """Build a config from defaults, an optional TOML file, and the env.
+        """Build a config from the TOML file and the environment.
 
         Args:
             path: TOML file to read. Defaults to ``config.toml`` at the repo
-                root. Missing files are ignored (defaults + env still apply).
+                root. Missing files are ignored.
+
+        Raises:
+            ValueError: if a required LLM environment variable is missing.
         """
         raw = _read_toml(path if path is not None else DEFAULT_CONFIG_PATH)
         wake_raw = raw.get("wake", {})
-        llm_raw = raw.get("llm", {})
 
         wake = WakeConfig(
-            phrase=_env_str("WAKE_PHRASE", _str_or(wake_raw, "phrase", WakeConfig.phrase)),
+            phrase=_env("WAKE_PHRASE", _str_or(wake_raw, "phrase", WakeConfig.phrase)),
         )
         llm = LlmConfig(
-            base_url=_env_str("LLM_BASE_URL", _str_or(llm_raw, "base_url", LlmConfig.base_url)),
-            api_key=_env_str("LLM_API_KEY", _str_or(llm_raw, "api_key", LlmConfig.api_key)),
-            model_fast=_env_str(
-                "LLM_MODEL_FAST", _str_or(llm_raw, "model_fast", LlmConfig.model_fast)
-            ),
-            model_smart=_env_str(
-                "LLM_MODEL_SMART", _str_or(llm_raw, "model_smart", LlmConfig.model_smart)
-            ),
+            base_url=_required_env("LLM_BASE_URL"),
+            api_key=_required_env("LLM_API_KEY"),
+            model_fast=_optional_env("LLM_MODEL_FAST"),
+            model_smart=_optional_env("LLM_MODEL_SMART"),
         )
-        return cls(wake=wake, llm=llm)
+        return cls(llm=llm, wake=wake)
 
 
 def _read_toml(path: Path) -> dict:
@@ -89,10 +90,24 @@ def _str_or(section: dict, key: str, default: str) -> str:
     return str(value) if value is not None else default
 
 
-def _env_str(suffix: str, default: str) -> str:
+def _env(suffix: str, default: str) -> str:
     """Return ``NOVA_<suffix>`` from the environment, else ``default``."""
     value = os.environ.get(ENV_PREFIX + suffix)
     return value if value not in (None, "") else default
+
+
+def _required_env(suffix: str) -> str:
+    """Return ``NOVA_<suffix>``, raising if unset or empty."""
+    value = os.environ.get(ENV_PREFIX + suffix)
+    if value in (None, ""):
+        raise ValueError(f"missing required environment variable {ENV_PREFIX}{suffix}")
+    return value
+
+
+def _optional_env(suffix: str) -> str | None:
+    """Return ``NOVA_<suffix>`` or ``None`` when unset/empty."""
+    value = os.environ.get(ENV_PREFIX + suffix)
+    return value if value not in (None, "") else None
 
 
 __all__ = ["Config", "LlmConfig", "WakeConfig", "DEFAULT_CONFIG_PATH", "ENV_PREFIX"]
