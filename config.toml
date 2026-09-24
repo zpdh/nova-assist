@@ -14,3 +14,7 @@ threads = 4
 # "auto" uses the GPU when available; "cpu" forces CPU (-ng).
 device = "auto"
 server_port = 18090
+
+[brain]
+# System prompt sent to the model. Override with NOVA_BRAIN_SYSTEM_PROMPT.
+system_prompt = "You are Nova, a concise voice assistant. Answer briefly and directly. Use the web_search tool when the answer needs current or verifiable facts."

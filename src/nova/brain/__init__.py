@@ -7,14 +7,18 @@ only.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from nova.brain.brain import Brain
 from nova.brain.client import ChatClient
 from nova.brain.errors import BrainError, BrainTimeout, BrainUnavailable
 from nova.brain.router import ModelRouter, SingleModelRouter
 from nova.brain.search import WebSearchClient
 from nova.brain.tools import build_dispatchers
-from nova.brain.types import ChatResult, Message, SearchResult, ToolCall
-from nova.config import LlmConfig
+from nova.brain.types import ChatResult, Completion, Message, SearchResult, ToolCall
+
+if TYPE_CHECKING:
+    from nova.config import LlmConfig
 
 
 def build_brain(config: LlmConfig) -> Brain:
@@ -31,6 +35,7 @@ __all__ = [
     "ChatClient",
     "Message",
     "ChatResult",
+    "Completion",
     "SearchResult",
     "ToolCall",
     "ModelRouter",

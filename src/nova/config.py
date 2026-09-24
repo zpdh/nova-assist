@@ -17,6 +17,7 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from nova.brain.config import BrainConfig
 from nova.stt.config import SttConfig
 
 ENV_PREFIX = "NOVA_"
@@ -57,6 +58,7 @@ class Config:
     llm: LlmConfig
     wake: WakeConfig = field(default_factory=WakeConfig)
     stt: SttConfig = field(default_factory=SttConfig)
+    brain: BrainConfig = field(default_factory=BrainConfig)
 
     @classmethod
     def load(cls, path: Path | None = None) -> Config:
@@ -74,9 +76,16 @@ class Config:
         config_dir = (path if path is not None else DEFAULT_CONFIG_PATH).parent
         wake_raw = raw.get("wake", {})
         stt_raw = raw.get("stt", {})
+        brain_raw = raw.get("brain", {})
 
         wake = WakeConfig(
             phrase=_env("WAKE_PHRASE", _str_or(wake_raw, "phrase", WakeConfig.phrase)),
+        )
+        brain = BrainConfig(
+            system_prompt=_env(
+                "BRAIN_SYSTEM_PROMPT",
+                _str_or(brain_raw, "system_prompt", BrainConfig.system_prompt),
+            ),
         )
         llm = LlmConfig(
             api_key=_required_env("LLM_API_KEY"),
@@ -85,7 +94,7 @@ class Config:
             search_provider=_env("LLM_SEARCH_PROVIDER", DEFAULT_SEARCH_PROVIDER),
         )
         stt = _build_stt_config(stt_raw, config_dir)
-        return cls(llm=llm, wake=wake, stt=stt)
+        return cls(llm=llm, wake=wake, stt=stt, brain=brain)
 
 
 def _build_stt_config(section: dict, config_dir: Path) -> SttConfig:
@@ -177,6 +186,7 @@ __all__ = [
     "LlmConfig",
     "WakeConfig",
     "SttConfig",
+    "BrainConfig",
     "DEFAULT_CONFIG_PATH",
     "DEFAULT_LLM_BASE_URL",
     "DEFAULT_SEARCH_PROVIDER",

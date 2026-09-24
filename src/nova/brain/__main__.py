@@ -9,6 +9,7 @@ import argparse
 import sys
 
 from nova.brain import BrainError, build_brain
+from nova.brain.types import Message
 from nova.config import Config
 from nova.logging_setup import setup_logging
 
@@ -26,8 +27,10 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     brain = build_brain(config.llm)
+    message = Message(role="user", content=args.question)
+    messages = [Message(role="system", content=config.brain.system_prompt), message]
     try:
-        print(brain.ask(args.question))
+        print(brain.chat(messages).text)
     except BrainError as exc:
         print(f"brain error: {exc}", file=sys.stderr)
         return 1
