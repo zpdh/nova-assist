@@ -34,12 +34,7 @@ def test_stt_toml_section(tmp_path, monkeypatch):
     _clear_nova_env(monkeypatch)
     _llm_env(monkeypatch)
     cfg_file = tmp_path / "config.toml"
-    cfg_file.write_text(
-        "[stt]\n"
-        'backend = "cli"\n'
-        'model_path = "models/custom.bin"\n'
-        "threads = 8\n"
-    )
+    cfg_file.write_text('[stt]\nbackend = "cli"\nmodel_path = "models/custom.bin"\nthreads = 8\n')
 
     cfg = Config.load(path=cfg_file)
 

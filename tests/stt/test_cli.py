@@ -78,9 +78,7 @@ def test_missing_binary_raises_unavailable(tmp_path):
 
 def test_missing_model_raises_unavailable(tmp_path):
     binary = _write_fake_cli(tmp_path)
-    config = SttConfig(
-        backend=BACKEND_CLI, cli_path=binary, model_path=tmp_path / "nope.bin"
-    )
+    config = SttConfig(backend=BACKEND_CLI, cli_path=binary, model_path=tmp_path / "nope.bin")
     transcriber = WhisperCliTranscriber(config)
 
     with pytest.raises(SttUnavailable, match="model file not found"):
@@ -111,9 +109,7 @@ def test_cpu_device_appends_no_gpu_flag(tmp_path, monkeypatch):
 
     model = tmp_path / "model.bin"
     model.write_bytes(b"fake")
-    config = SttConfig(
-        backend=BACKEND_CLI, cli_path=script, model_path=model, device="cpu"
-    )
+    config = SttConfig(backend=BACKEND_CLI, cli_path=script, model_path=model, device="cpu")
 
     WhisperCliTranscriber(config).transcribe(_write_wav(tmp_path))
 

@@ -60,9 +60,7 @@ def _fake_server_binary(tmp_path: Path) -> Path:
 def _config(tmp_path: Path, binary: Path, port: int) -> SttConfig:
     model = tmp_path / "model.bin"
     model.write_bytes(b"fake")
-    return SttConfig(
-        backend=BACKEND_SERVER, server_path=binary, model_path=model, server_port=port
-    )
+    return SttConfig(backend=BACKEND_SERVER, server_path=binary, model_path=model, server_port=port)
 
 
 def test_transcribes_against_running_server(tmp_path, fake_server):
@@ -99,9 +97,7 @@ def test_missing_binary_raises_unavailable(tmp_path):
 
 def test_missing_model_raises_unavailable(tmp_path):
     binary = _fake_server_binary(tmp_path)
-    config = SttConfig(
-        backend=BACKEND_SERVER, server_path=binary, model_path=tmp_path / "nope.bin"
-    )
+    config = SttConfig(backend=BACKEND_SERVER, server_path=binary, model_path=tmp_path / "nope.bin")
     transcriber = WhisperServerTranscriber(config)
 
     wav = tmp_path / "a.wav"
