@@ -24,6 +24,9 @@ samples/
 # --- Local scratch (test clips, throwaway artifacts) ---
 tmp/
 
+# --- Logs ---
+logs/
+
 # --- Native build artifacts ---
 *.o
 *.so

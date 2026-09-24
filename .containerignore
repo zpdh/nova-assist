@@ -4,6 +4,7 @@ third_party/
 models/
 samples/
 tmp/
+logs/
 .venv/
 .git/
 docs/
