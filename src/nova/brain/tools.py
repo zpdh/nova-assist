@@ -48,7 +48,7 @@ def build_dispatchers(search: WebSearchClient) -> dict[str, Callable[[dict[str, 
 
 
 def _make_web_search(search: WebSearchClient) -> Callable[[dict[str, Any]], str]:
-	# Return a callable that already holds the search client, so the dispatch
+    # Return a callable that already holds the search client, so the dispatch
     # table maps a tool name to a one-argument function (the tool arguments).
     # This keeps the brain unaware of which clients each tool needs.
     def run(arguments: dict[str, Any]) -> str:

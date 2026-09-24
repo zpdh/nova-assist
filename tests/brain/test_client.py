@@ -10,7 +10,7 @@ import pytest
 
 from nova.brain.client import ChatClient, decode_first_json, parse_tool_arguments
 from nova.brain.errors import BrainError
-from nova.brain.types import Message
+from nova.brain.types import Completion, Message
 
 _CHAT_RESPONSE = {
     "model": "test-model",
@@ -56,6 +56,7 @@ def test_complete_returns_text(fake_chat_server):
 
     result = client.complete([Message(role="user", content="hi")])
 
+    assert isinstance(result, Completion)
     assert result.text == "hello"
     assert result.model == "test-model"
     assert result.usage == {"total_tokens": 5}

@@ -11,6 +11,7 @@ import pytest
 from nova.brain.brain import MAX_TOOL_ROUNDS, Brain
 from nova.brain.client import ChatClient
 from nova.brain.router import SingleModelRouter
+from nova.brain.types import Message
 
 _TOOL_CALL = {
     "id": "call-1",
@@ -64,7 +65,11 @@ def test_plain_answer_without_tools(scripted_server):
     scripted_server.responses = [_assistant("plain answer")]
     brain = _brain(scripted_server, {})
 
-    assert brain.ask("hi") == "plain answer"
+    result = brain.chat([Message(role="user", content="hi")])
+
+    assert result.text == "plain answer"
+    assert [t.role for t in result.turns] == ["assistant"]
+    assert result.turns[0].content == "plain answer"
     brain.close()
 
 
@@ -81,8 +86,16 @@ def test_tool_call_is_resolved_then_answered(scripted_server):
 
     brain = _brain(scripted_server, {"web_search": web_search})
 
-    assert brain.ask("weather?") == "grounded answer"
+    result = brain.chat([Message(role="user", content="weather?")])
+
+    assert result.text == "grounded answer"
     assert seen == {"query": "paris weather"}
+    # turns records the full transcript generated this turn.
+    assert [t.role for t in result.turns] == ["assistant", "tool", "assistant"]
+    assert result.turns[0].tool_calls[0]["id"] == "call-1"
+    assert result.turns[1].content == "RESULT LINES"
+    assert result.turns[1].tool_call_id == "call-1"
+    assert result.turns[2].content == "grounded answer"
     # Second request carries the tool result back to the model.
     tool_messages = [m for m in scripted_server.requests[1]["messages"] if m["role"] == "tool"]
     assert tool_messages[0]["content"] == "RESULT LINES"
@@ -125,9 +138,11 @@ def test_tool_loop_is_bounded(scripted_server):
     scripted_server.responses = [_assistant(tool_calls=[_TOOL_CALL])] * (MAX_TOOL_ROUNDS + 2)
     brain = _brain(scripted_server, {"web_search": lambda args: "r"})
 
-    result = brain.ask("x")
+    result = brain.chat([Message(role="user", content="x")])
 
-    assert result == ""  # no text was ever produced
+    assert result.text == ""  # no text was ever produced
     # 1 initial call + MAX_TOOL_ROUNDS follow-ups.
     assert len(scripted_server.requests) == MAX_TOOL_ROUNDS + 1
+    # The last (unrun) assistant tool-call turn is still recorded.
+    assert result.turns[-1].tool_calls[0]["id"] == "call-1"
     brain.close()

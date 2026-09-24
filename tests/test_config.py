@@ -92,3 +92,33 @@ def test_missing_required_llm_env_raises(monkeypatch):
 
     with pytest.raises(ValueError, match="NOVA_LLM_MODEL"):
         Config.load()
+
+
+def test_brain_system_prompt_default(monkeypatch):
+    _clear_nova_env(monkeypatch)
+    _set_llm_env(monkeypatch)
+
+    cfg = Config.load(path=Path("/nonexistent/config.toml"))
+
+    assert "Nova" in cfg.brain.system_prompt
+
+
+def test_brain_system_prompt_from_toml(tmp_path: Path, monkeypatch):
+    _clear_nova_env(monkeypatch)
+    _set_llm_env(monkeypatch)
+    cfg_file = tmp_path / "config.toml"
+    cfg_file.write_text('[brain]\nsystem_prompt = "Be terse."\n')
+
+    cfg = Config.load(path=cfg_file)
+
+    assert cfg.brain.system_prompt == "Be terse."
+
+
+def test_brain_system_prompt_env_override(monkeypatch):
+    _clear_nova_env(monkeypatch)
+    _set_llm_env(monkeypatch)
+    monkeypatch.setenv(f"{ENV_PREFIX}BRAIN_SYSTEM_PROMPT", "env prompt")
+
+    cfg = Config.load(path=Path("/nonexistent/config.toml"))
+
+    assert cfg.brain.system_prompt == "env prompt"
