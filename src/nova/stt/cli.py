@@ -19,6 +19,12 @@ from nova.stt.types import Transcript
 
 log = logging.getLogger(__name__)
 
+# whisper-cli writes one file per requested format. ``-oj`` selects JSON and the
+# produced file is named ``<output-prefix>.json`` (``-of`` is a path *prefix*,
+# without an extension). Keep the flag and extension paired here.
+_OUTPUT_FLAG = "-oj"
+_OUTPUT_EXT = ".json"
+
 
 class WhisperCliTranscriber:
     """Transcribes audio by invoking the ``whisper-cli`` binary."""
@@ -54,7 +60,7 @@ class WhisperCliTranscriber:
                     f"whisper-cli exited with {result.returncode}: {result.stderr.strip()}"
                 )
 
-            json_path = out_prefix.with_suffix(".json")
+            json_path = out_prefix.with_suffix(_OUTPUT_EXT)
             if not json_path.is_file():
                 raise SttError("whisper-cli did not produce JSON output")
             document = json.loads(json_path.read_text(encoding="utf-8"))
@@ -71,7 +77,7 @@ class WhisperCliTranscriber:
             str(self._model),
             "-f",
             str(wav_path),
-            "-oj",  # JSON output
+            _OUTPUT_FLAG,  # JSON output -> <prefix>.json
             "-of",
             str(out_prefix),
             "-np",  # no extra prints
