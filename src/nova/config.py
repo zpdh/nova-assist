@@ -25,17 +25,22 @@ ENV_PREFIX = "NOVA_"
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config.toml"
 
 
+DEFAULT_LLM_BASE_URL = "http://localhost:20128/v1"
+DEFAULT_SEARCH_PROVIDER = "tavily"
+
+
 @dataclass(frozen=True)
 class LlmConfig:
     """LLM settings for an OpenAI-compatible endpoint.
 
-    All values come from environment variables; none have defaults.
+    ``base_url`` and ``search_provider`` have defaults; ``api_key`` and
+    ``model`` come from the environment and are required.
     """
 
-    base_url: str
     api_key: str
-    model_fast: str | None = None
-    model_smart: str | None = None
+    model: str
+    base_url: str = DEFAULT_LLM_BASE_URL
+    search_provider: str = DEFAULT_SEARCH_PROVIDER
 
 
 @dataclass(frozen=True)
@@ -74,10 +79,10 @@ class Config:
             phrase=_env("WAKE_PHRASE", _str_or(wake_raw, "phrase", WakeConfig.phrase)),
         )
         llm = LlmConfig(
-            base_url=_required_env("LLM_BASE_URL"),
             api_key=_required_env("LLM_API_KEY"),
-            model_fast=_optional_env("LLM_MODEL_FAST"),
-            model_smart=_optional_env("LLM_MODEL_SMART"),
+            model=_required_env("LLM_MODEL"),
+            base_url=_env("LLM_BASE_URL", DEFAULT_LLM_BASE_URL),
+            search_provider=_env("LLM_SEARCH_PROVIDER", DEFAULT_SEARCH_PROVIDER),
         )
         stt = _build_stt_config(stt_raw, config_dir)
         return cls(llm=llm, wake=wake, stt=stt)
@@ -167,4 +172,13 @@ def _path_env(suffix: str, default: Path) -> Path:
     return Path(value) if value is not None else default
 
 
-__all__ = ["Config", "LlmConfig", "WakeConfig", "SttConfig", "DEFAULT_CONFIG_PATH", "ENV_PREFIX"]
+__all__ = [
+    "Config",
+    "LlmConfig",
+    "WakeConfig",
+    "SttConfig",
+    "DEFAULT_CONFIG_PATH",
+    "DEFAULT_LLM_BASE_URL",
+    "DEFAULT_SEARCH_PROVIDER",
+    "ENV_PREFIX",
+]
