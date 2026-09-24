@@ -28,8 +28,19 @@ from nova.stt.types import Transcript
 
 log = logging.getLogger(__name__)
 
+
+class _StartupFailed(Exception):
+    """Internal: a whisper-server startup attempt failed and may be retried."""
+
+
 _STARTUP_TIMEOUT_S = 30.0
 _REQUEST_TIMEOUT_S = 120.0
+
+# Port collisions are rare: probing a port and then having whisper-server bind
+# it is a TOCTOU race (the port is unowned between our probe and its bind).
+# whisper-server has no socket-activation support, so we cannot hand it a
+# reserved socket; instead we retry the whole startup with a fresh port.
+_STARTUP_ATTEMPTS = 3
 
 
 class WhisperServerTranscriber:
@@ -44,6 +55,9 @@ class WhisperServerTranscriber:
         self._process: subprocess.Popen[bytes] | None = None
         self._log_path: Path | None = None
         self._log_file = None
+        # One client reused across requests; closed by close(). A shared,
+        # app-scoped client will be introduced with the app context in I5.
+        self._client = httpx.Client(timeout=_REQUEST_TIMEOUT_S)
 
     # -- public API -------------------------------------------------------
 
@@ -56,13 +70,12 @@ class WhisperServerTranscriber:
 
         url = f"http://{self._host}:{self._port}/inference"
         try:
-            with httpx.Client(timeout=_REQUEST_TIMEOUT_S) as client:
-                with wav_path.open("rb") as fh:
-                    response = client.post(
-                        url,
-                        files={"file": (wav_path.name, fh, "audio/wav")},
-                        data={"response_format": "verbose_json"},
-                    )
+            with wav_path.open("rb") as fh:
+                response = self._client.post(
+                    url,
+                    files={"file": (wav_path.name, fh, "audio/wav")},
+                    data={"response_format": "verbose_json"},
+                )
         except httpx.TimeoutException as exc:
             raise SttTimeout(f"transcription request timed out: {url}") from exc
         except httpx.HTTPError as exc:
@@ -79,7 +92,12 @@ class WhisperServerTranscriber:
         return parse_response(payload)
 
     def close(self) -> None:
-        """Terminate the server process if running."""
+        """Terminate the server process and release resources (idempotent)."""
+        self._stop_process()
+        if not self._client.is_closed:
+            self._client.close()
+
+    def _stop_process(self) -> None:
         process = self._process
         self._process = None
         if process is None or process.poll() is not None:
@@ -117,9 +135,28 @@ class WhisperServerTranscriber:
         if self._process is not None and self._process.poll() is None:
             return
         self._check_available()
-        self._port = _free_port(self._port, self._host)
-        self._start_process()
-        self._wait_until_ready()
+
+        last_error: Exception | None = None
+        for attempt in range(1, _STARTUP_ATTEMPTS + 1):
+            # Pick a fresh port each attempt to absorb a TOCTOU collision.
+            self._port = _free_port(self._config.server_port, self._host)
+            try:
+                self._start_process()
+                self._wait_until_ready()
+                return
+            except _StartupFailed as exc:
+                last_error = exc
+                log.debug(
+                    "whisper-server startup attempt %d/%d failed: %s",
+                    attempt,
+                    _STARTUP_ATTEMPTS,
+                    exc,
+                )
+                self._stop_process()
+
+        raise SttUnavailable(
+            f"whisper-server failed to start after {_STARTUP_ATTEMPTS} attempts: {last_error}"
+        )
 
     def _start_process(self) -> None:
         cmd = [
@@ -154,16 +191,16 @@ class WhisperServerTranscriber:
         url = f"http://{self._host}:{self._port}/"
         while time.monotonic() < deadline:
             if self._process.poll() is not None:
-                raise SttUnavailable(
+                raise _StartupFailed(
                     f"whisper-server exited during startup (code {self._process.returncode}); "
                     f"see {self._log_path}"
                 )
             try:
-                httpx.get(url, timeout=1.0)
+                self._client.get(url, timeout=1.0)
                 return
             except httpx.HTTPError:
                 time.sleep(0.1)
-        raise SttTimeout(f"whisper-server did not become ready within {_STARTUP_TIMEOUT_S}s")
+        raise _StartupFailed(f"whisper-server did not become ready within {_STARTUP_TIMEOUT_S}s")
 
     def _check_available(self) -> None:
         if not self._binary.is_file():
@@ -182,6 +219,7 @@ def _free_port(preferred: int, host: str) -> int:
             except OSError:
                 continue
             return sock.getsockname()[1]
+
     raise SttUnavailable("no free port available for whisper-server")
 
 
