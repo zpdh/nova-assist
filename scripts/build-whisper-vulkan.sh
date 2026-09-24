@@ -7,7 +7,7 @@
 #   - whisper-stream  (streaming / wake-word loop, later increments)
 #
 # Requirements (host, one-time):
-#   sudo dnf install cmake gcc-c++ glslc vulkan-loader-devel
+#   sudo dnf install cmake gcc-c++ glslc vulkan-loader-devel spirv-headers-devel glslang
 #
 # The vendored source is expected at third_party/whisper.cpp (see docs).
 set -euo pipefail

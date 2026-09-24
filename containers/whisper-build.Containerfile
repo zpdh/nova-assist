@@ -7,6 +7,8 @@ RUN dnf install -y \
       gcc-c++ \
       glslc \
       vulkan-loader-devel \
+      spirv-headers-devel \
+      glslang \
       make \
       git \
     && dnf clean all
