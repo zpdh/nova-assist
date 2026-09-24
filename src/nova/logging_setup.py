@@ -44,7 +44,8 @@ def _resolve_level(level: str | int | None) -> int:
         level = os.environ.get("NOVA_LOG_LEVEL", DEFAULT_LEVEL)
     if isinstance(level, int):
         return level
-    return logging.getLevelName(level.upper())
+
+    return logging.getLevelNamesMapping()[level.upper()]
 
 
 __all__ = ["setup_logging", "DEFAULT_FORMAT", "DEFAULT_LEVEL"]
