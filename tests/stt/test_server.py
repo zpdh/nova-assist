@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from nova.stt import server as server_mod
 from nova.stt.config import BACKEND_SERVER, SttConfig
 from nova.stt.errors import SttUnavailable
 from nova.stt.server import WhisperServerTranscriber
@@ -125,3 +126,95 @@ class _RunningStub:
 
     def poll(self):
         return None
+
+
+def test_http_client_is_reused_across_calls(tmp_path, fake_server):
+    config = _config(tmp_path, _fake_server_binary(tmp_path), fake_server)
+    transcriber = WhisperServerTranscriber(config)
+    transcriber._process = _RunningStub()
+    client = transcriber._client
+
+    wav = tmp_path / "a.wav"
+    wav.write_bytes(b"RIFF")
+    transcriber.transcribe(wav)
+    transcriber.transcribe(wav)
+
+    assert transcriber._client is client
+    assert not client.is_closed
+
+
+def test_close_closes_http_client(tmp_path):
+    config = _config(tmp_path, _fake_server_binary(tmp_path), 18000)
+    transcriber = WhisperServerTranscriber(config)
+    client = transcriber._client
+
+    transcriber.close()
+
+    assert client.is_closed
+    transcriber.close()  # idempotent
+
+
+def test_retries_with_new_port_on_startup_failure(tmp_path, fake_server, monkeypatch):
+    config = _config(tmp_path, _fake_server_binary(tmp_path), fake_server)
+    transcriber = WhisperServerTranscriber(config)
+
+    ports_tried: list[int] = []
+    real_free_port = server_mod._free_port
+
+    def tracking_free_port(preferred, host):
+        port = real_free_port(preferred, host) if not ports_tried else 0
+        ports_tried.append(port)
+        return port
+
+    monkeypatch.setattr(server_mod, "_free_port", tracking_free_port)
+
+    # First readiness wait fails, second succeeds.
+    attempts = {"n": 0}
+
+    def flaky_wait():
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            raise server_mod._StartupFailed("simulated port collision")
+        # Second attempt succeeds; point at the real fake server for the request.
+        transcriber._port = fake_server
+
+    monkeypatch.setattr(transcriber, "_wait_until_ready", flaky_wait)
+    monkeypatch.setattr(transcriber, "_start_process", lambda: None)
+
+    wav = tmp_path / "a.wav"
+    wav.write_bytes(b"RIFF")
+    result = transcriber.transcribe(wav)
+
+    assert result.text == " hey nova"
+    assert attempts["n"] == 2
+    assert len(ports_tried) == 2
+    assert ports_tried[0] != ports_tried[1]
+
+
+def test_does_not_retry_on_non_startup_error(tmp_path, monkeypatch):
+    config = _config(tmp_path, tmp_path / "nope", 18000)
+    transcriber = WhisperServerTranscriber(config)
+
+    wav = tmp_path / "a.wav"
+    wav.write_bytes(b"RIFF")
+
+    # Missing binary raises SttUnavailable (not _StartupFailed) -> no retry.
+    with pytest.raises(SttUnavailable, match="binary not found"):
+        transcriber.transcribe(wav)
+
+
+def test_all_attempts_failing_raises_unavailable(tmp_path, monkeypatch):
+    config = _config(tmp_path, _fake_server_binary(tmp_path), 18000)
+    transcriber = WhisperServerTranscriber(config)
+
+    monkeypatch.setattr(transcriber, "_start_process", lambda: None)
+
+    def always_fail():
+        raise server_mod._StartupFailed("simulated")
+
+    monkeypatch.setattr(transcriber, "_wait_until_ready", always_fail)
+
+    wav = tmp_path / "a.wav"
+    wav.write_bytes(b"RIFF")
+    with pytest.raises(SttUnavailable, match="after 3 attempts"):
+        transcriber.transcribe(wav)
