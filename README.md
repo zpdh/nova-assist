@@ -59,13 +59,37 @@ defaults.
 ## Speech-to-text
 
 The `nova.stt` package exposes a `Transcriber` protocol and a
-`build_transcriber` factory. Backends:
+`build_transcriber` factory, so callers never touch whisper.cpp directly.
+Both backends come from the same whisper.cpp project; they differ in process
+model, not in engine.
 
-- **server** (default): a resident `whisper-server`, model kept in VRAM,
-  OpenAI-compatible `/inference`.
-- **cli**: one `whisper-cli` invocation per file (simpler, reloads the model).
+| Backend | Process model | Per-call latency | Use when |
+|---|---|---|---|
+| **server** (default) | one long-lived `whisper-server`, model resident in VRAM | encode + decode only (~120 ms tiny) | the assistant runs interactively / always-on — the normal case |
+| **cli** | one `whisper-cli` run per file | includes model load (~80 ms tiny) | tests, batch, fallback, or a quick one-off |
 
-Both return a `Transcript` with text and optional word-level timings.
+Both return a `Transcript` with the text and optional word-level timings.
+A future `stream` backend (whisper-stream) will serve continuous wake-word
+spotting; the protocol is kept narrow so adding one is not a rewrite.
+
+### Notes
+
+- The server is started lazily on first use and stopped by `close()` (or via
+  `with`). Selecting a port is subject to a probe/bind race, so startup is
+  retried up to 3 times with a fresh port before failing.
+- One HTTP client is reused for the server's lifetime.
+
+## Logging
+
+Logs go to **stderr** and to a dated file under `logs/`:
+
+```
+logs/nova-2026-09-24.log      # first run that day
+logs/nova-2026-09-24-2.log    # next run, same day
+```
+
+The level is taken from `NOVA_LOG_LEVEL` (default `INFO`). If the log file
+cannot be opened, logging continues on the console only. `logs/` is gitignored.
 
 ## Layout
 
@@ -75,4 +99,5 @@ tests/          pytest suite
 scripts/        build helpers (whisper.cpp Vulkan)
 containers/     optional Podman build + test images
 docs/           design notes and proofs
+logs/           runtime logs (gitignored)
 ```
