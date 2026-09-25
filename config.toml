@@ -18,3 +18,7 @@ server_port = 18090
 [brain]
 # System prompt sent to the model. Override with NOVA_BRAIN_SYSTEM_PROMPT.
 system_prompt = "You are Nova, a concise voice assistant. Answer briefly and directly. Use the web_search tool when the answer needs current or verifiable facts."
+
+[store]
+# SQLite database for conversation history. Override with NOVA_STORE_DB_PATH.
+db_path = "data/nova.db"

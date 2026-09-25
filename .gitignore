@@ -27,6 +27,9 @@ tmp/
 # --- Logs ---
 logs/
 
+# --- Local database ---
+data/
+
 # --- Native build artifacts ---
 *.o
 *.so

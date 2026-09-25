@@ -5,6 +5,7 @@ models/
 samples/
 tmp/
 logs/
+data/
 .venv/
 .git/
 docs/

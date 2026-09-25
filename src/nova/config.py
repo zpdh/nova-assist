@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from nova.brain.config import BrainConfig
+from nova.store.config import StoreConfig
 from nova.stt.config import SttConfig
 
 ENV_PREFIX = "NOVA_"
@@ -59,6 +60,7 @@ class Config:
     wake: WakeConfig = field(default_factory=WakeConfig)
     stt: SttConfig = field(default_factory=SttConfig)
     brain: BrainConfig = field(default_factory=BrainConfig)
+    store: StoreConfig = field(default_factory=StoreConfig)
 
     @classmethod
     def load(cls, path: Path | None = None) -> Config:
@@ -77,6 +79,7 @@ class Config:
         wake_raw = raw.get("wake", {})
         stt_raw = raw.get("stt", {})
         brain_raw = raw.get("brain", {})
+        store_raw = raw.get("store", {})
 
         wake = WakeConfig(
             phrase=_env("WAKE_PHRASE", _str_or(wake_raw, "phrase", WakeConfig.phrase)),
@@ -94,7 +97,12 @@ class Config:
             search_provider=_env("LLM_SEARCH_PROVIDER", DEFAULT_SEARCH_PROVIDER),
         )
         stt = _build_stt_config(stt_raw, config_dir)
-        return cls(llm=llm, wake=wake, stt=stt, brain=brain)
+        store = StoreConfig(
+            db_path=_path_env(
+                "STORE_DB_PATH", _path_or(store_raw, "db_path", StoreConfig.db_path, config_dir)
+            ),
+        )
+        return cls(llm=llm, wake=wake, stt=stt, brain=brain, store=store)
 
 
 def _build_stt_config(section: dict, config_dir: Path) -> SttConfig:
@@ -187,6 +195,7 @@ __all__ = [
     "WakeConfig",
     "SttConfig",
     "BrainConfig",
+    "StoreConfig",
     "DEFAULT_CONFIG_PATH",
     "DEFAULT_LLM_BASE_URL",
     "DEFAULT_SEARCH_PROVIDER",
