@@ -3,9 +3,9 @@
 ``WakeConfig`` is read from an optional TOML file (default: ``config.toml`` at
 the repo root) and can be overridden by environment variables.
 
-``LlmConfig`` is sourced entirely from environment variables (``NOVA_*``),
-typically supplied via a local ``.env`` loaded by the caller/shell. It has no
-built-in defaults: LLM settings are deployment-specific.
+``LlmConfig`` is sourced from environment variables (``NOVA_*``). A local
+``.env`` next to the TOML file is loaded automatically; real environment
+variables take precedence over it.
 
 Secrets must never live in the TOML file; they come from the environment.
 """
@@ -16,6 +16,7 @@ import os
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Literal
 
 from nova.brain.config import BrainConfig
 from nova.store.config import StoreConfig
@@ -25,6 +26,8 @@ ENV_PREFIX = "NOVA_"
 
 # Repo root = two levels up from this file (src/nova/config.py -> repo root).
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config.toml"
+
+DEFAULT_ENV_FILENAME = ".env"
 
 
 DEFAULT_LLM_BASE_URL = "http://localhost:20128/v1"
@@ -63,19 +66,30 @@ class Config:
     store: StoreConfig = field(default_factory=StoreConfig)
 
     @classmethod
-    def load(cls, path: Path | None = None) -> Config:
+    def load(
+        cls,
+        path: Path | None = None,
+        env_file: Path | Literal["auto"] | None = "auto",
+    ) -> Config:
         """Build a config from the TOML file and the environment.
 
         Args:
             path: TOML file to read. Defaults to ``config.toml`` at the repo
                 root. Missing files are ignored.
+            env_file: ``.env`` file to load before reading the environment.
+                ``"auto"`` (default) uses a ``.env`` next to the TOML file;
+                ``None`` skips loading; a path uses that file. Existing
+                environment variables are not overwritten.
 
         Raises:
             ValueError: if a required LLM environment variable is missing, or a
                 configured value is invalid.
         """
-        raw = _read_toml(path if path is not None else DEFAULT_CONFIG_PATH)
-        config_dir = (path if path is not None else DEFAULT_CONFIG_PATH).parent
+        config_path = path if path is not None else DEFAULT_CONFIG_PATH
+        config_dir = config_path.parent
+        _load_dotenv(_resolve_env_file(env_file, config_dir))
+
+        raw = _read_toml(config_path)
         wake_raw = raw.get("wake", {})
         stt_raw = raw.get("stt", {})
         brain_raw = raw.get("brain", {})
@@ -134,6 +148,37 @@ def _read_toml(path: Path) -> dict:
         return {}
     with path.open("rb") as fh:
         return tomllib.load(fh)
+
+
+def _resolve_env_file(
+    env_file: Path | Literal["auto"] | None,
+    config_dir: Path,
+) -> Path | None:
+    """Turn the ``env_file`` argument into a path, or ``None`` to skip."""
+    if env_file is None:
+        return None
+    if env_file == "auto":
+        return config_dir / DEFAULT_ENV_FILENAME
+    return env_file
+
+
+def _load_dotenv(path: Path | None) -> None:
+    """Load ``KEY=VALUE`` lines from ``path`` into the environment.
+
+    Existing environment variables are kept. Blank lines and comments are
+    ignored. A missing file is a no-op.
+    """
+    if path is None or not path.is_file():
+        return
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
 
 
 def _str_or(section: dict, key: str, default: str) -> str:

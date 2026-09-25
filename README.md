@@ -46,9 +46,10 @@ podman run --rm nova-test
 
 ## Configuration
 
-- `config.toml` — non-secret defaults (currently the wake phrase).
+- `config.toml` — non-secret defaults (wake phrase, prompt, paths).
 - `.env` — secrets and deployment-specific settings, gitignored. Copy from
-  `.env.example`.
+  `.env.example`. It is **loaded automatically** (next to `config.toml`) at
+  `Config.load`; real environment variables take precedence over it.
 
 The wake phrase is read from `config.toml` and can be overridden by
 `NOVA_WAKE_PHRASE`. The `[stt]` section (`config.toml` / `NOVA_STT_*`) selects
