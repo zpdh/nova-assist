@@ -6,12 +6,12 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class Session:
-    """One conversation session."""
+class SessionInfo:
+    """One stored conversation session (metadata only)."""
 
     id: str
     created_at: str
     updated_at: str
 
 
-__all__ = ["Session"]
+__all__ = ["SessionInfo"]

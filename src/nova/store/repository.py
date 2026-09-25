@@ -17,7 +17,7 @@ from typing import Protocol, runtime_checkable
 
 from nova.brain.types import Message
 from nova.store import schema
-from nova.store.types import Session
+from nova.store.types import SessionInfo
 
 log = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class Repository(Protocol):
 
     def load(self, session_id: str) -> list[Message]: ...
 
-    def list_sessions(self) -> list[Session]: ...
+    def list_sessions(self) -> list[SessionInfo]: ...
 
     def close(self) -> None: ...
 
@@ -95,13 +95,13 @@ class SqliteRepository:
         ).fetchall()
         return [_row_to_message(row) for row in rows]
 
-    def list_sessions(self) -> list[Session]:
+    def list_sessions(self) -> list[SessionInfo]:
         """Return all sessions, oldest first (uuid7 ids sort by time)."""
         rows = self._connection.execute(
             "SELECT id, created_at, updated_at FROM sessions ORDER BY id"
         ).fetchall()
         return [
-            Session(id=row["id"], created_at=row["created_at"], updated_at=row["updated_at"])
+            SessionInfo(id=row["id"], created_at=row["created_at"], updated_at=row["updated_at"])
             for row in rows
         ]
 
