@@ -108,6 +108,32 @@ python -m nova.brain "what is the capital of France"
 Requires `NOVA_LLM_API_KEY` and `NOVA_LLM_MODEL` in `.env`. Some models reject
 tool calls (web search needs a tool-capable model).
 
+The system prompt comes from config (`config.toml [brain]`,
+`NOVA_BRAIN_SYSTEM_PROMPT`). The CLI composes `[system, user]`; `Brain.chat`
+itself is stateless.
+
+## Store
+
+The `nova.store` package persists conversations in SQLite. A `Repository`
+(a gateway that hides the database) stores sessions and messages; a
+`Session` service composes it with the brain.
+
+- `Repository` — `create_session`, `append`, `append_all`, `load`, `list_sessions`.
+- `Session.ask(text)` — loads history, prepends the system prompt, asks the
+  brain, and persists the user message plus the generated turns.
+- Session ids are **uuid7** (time-ordered), so `list_sessions()` is chronological.
+- The database lives at `data/nova.db` (gitignored); override with
+  `NOVA_STORE_DB_PATH`.
+
+### Demo — a persisted conversation
+
+```bash
+python -m nova.brain --session demo "My name is Antunes. Remember it."
+python -m nova.brain --session demo "What is my name?"   # recalls it across runs
+```
+
+Without `--session`, the CLI stays one-shot (no persistence).
+
 ## Logging
 
 Logs go to **stderr** and to a dated file under `logs/`:
